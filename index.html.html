@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone Shelf Optimization App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f8ff;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #007bff;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        select, button {
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .shelf {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .shelf-item {
+            aspect-ratio: 1;
+            border: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+        .shelf-item:hover {
+            background-color: #f0f0f0;
+        }
+        .heat-map {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .heat-map-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+        .drink-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .drink-item {
+            background-color: #f0f8ff;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+        .drink-item input {
+            width: 60px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Shelf Optimization App</h1>
+        <div class="controls">
+            <select id="drink-select"></select>
+            <div>
+                <button id="prev-shelf">&lt; Previous Shelf</button>
+                <span id="shelf-number">Shelf 1</span>
+                <button id="next-shelf">Next Shelf &gt;</button>
+            </div>
+        </div>
+        <div id="current-shelf" class="shelf"></div>
+        <h2>Heat Map</h2>
+        <div id="heat-map" class="heat-map"></div>
+        <div class="optimization-controls">
+            <h2>Drink Selling Power</h2>
+            <div id="drink-list" class="drink-list"></div>
+            <button id="optimize-button">Optimize Shelves</button>
+        </div>
+    </div>
+
+    <script>
+        const drinks = [
+            { name: "Water", price: 0.50, sellingPower: 5 },
+            { name: "Coca Cola", price: 0.99, sellingPower: 8 },
+            { name: "Mirinda", price: 0.99, sellingPower: 6 },
+            { name: "Pepsi", price: 0.99, sellingPower: 7 },
+            { name: "Sprite", price: 0.99, sellingPower: 7 }
+        ];
+
+        const shelves = [
+            { id: 1, name: "Shelf 1", items: Array(25).fill(null) },
+            { id: 2, name: "Shelf 2", items: Array(25).fill(null) },
+            { id: 3, name: "Shelf 3", items: Array(25).fill(null) }
+        ];
+
+        let currentShelfIndex = 0;
+
+        const heatMap = [
+            8, 9, 10, 9, 8,
+            7, 8, 9, 8, 7,
+            6, 7, 8, 7, 6,
+            5, 6, 7, 6, 5,
+            4, 5, 6, 5, 4
+        ];
+
+        function initializeDrinkSelect() {
+            const select = document.getElementById('drink-select');
+            drinks.forEach(drink => {
+                const option = document.createElement('option');
+                option.value = drink.name;
+                option.textContent = `${drink.name} ($${drink.price.toFixed(2)})`;
+                select.appendChild(option);
+            });
+        }
+
+        function createShelfItem(index) {
+            const item = document.createElement('div');
+            item.className = 'shelf-item';
+            item.textContent = '-';
+            item.addEventListener('click', () => addDrinkToShelf(index));
+            return item;
+        }
+
+        function updateShelfDisplay() {
+            const shelfElement = document.getElementById('current-shelf');
+            shelfElement.innerHTML = '';
+            const currentShelf = shelves[currentShelfIndex];
+            currentShelf.items.forEach((item, index) => {
+                const shelfItem = createShelfItem(index);
+                if (item) {
+                    shelfItem.textContent = item;
+                    shelfItem.style.backgroundColor = getColorForDrink(item);
+                }
+                shelfElement.appendChild(shelfItem);
+            });
+            document.getElementById('shelf-number').textContent = currentShelf.name;
+        }
+
+        function addDrinkToShelf(index) {
+            const selectedDrink = document.getElementById('drink-select').value;
+            shelves[currentShelfIndex].items[index] = selectedDrink;
+            updateShelfDisplay();
+        }
+
+        function createHeatMap() {
+            const heatMapElement = document.getElementById('heat-map');
+            heatMap.forEach(value => {
+                const item = document.createElement('div');
+                item.className = 'heat-map-item';
+                item.textContent = value;
+                const hue = (value / 10) * 120; // 0 is red, 120 is green
+                item.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
+                heatMapElement.appendChild(item);
+            });
+        }
+
+        function initializeDrinkList() {
+            const drinkList = document.getElementById('drink-list');
+            drinks.forEach(drink => {
+                const drinkItem = document.createElement('div');
+                drinkItem.className = 'drink-item';
+                drinkItem.innerHTML = `
+                    <span>${drink.name}</span>
+                    <input type="number" id="selling-power-${drink.name}" value="${drink.sellingPower}" min="1" max="10">
+                `;
+                drinkList.appendChild(drinkItem);
+            });
+        }
+
+        function optimizeShelves() {
+            // Update selling power from user input
+            drinks.forEach(drink => {
+                const input = document.getElementById(`selling-power-${drink.name}`);
+                drink.sellingPower = parseInt(input.value) || drink.sellingPower;
+            });
+
+            // Sort drinks by selling power (highest to lowest)
+            const sortedDrinks = [...drinks].sort((a, b) => b.sellingPower - a.sellingPower);
+
+            // Collect all currently placed drinks from all shelves
+            const allItems = shelves.flatMap(shelf => shelf.items).filter(item => item !== null);
+
+            // Create a map of drink names to their quantities
+            const drinkQuantities = allItems.reduce((acc, item) => {
+                acc[item] = (acc[item] || 0) + 1;
+                return acc;
+            }, {});
+
+            // Clear all shelves
+            shelves.forEach(shelf => shelf.items = Array(25).fill(null));
+
+            // Create a sorted list of positions based on heat map values
+            const sortedPositions = heatMap
+                .map((value, index) => ({ value, index }))
+                .sort((a, b) => b.value - a.value);
+
+            // Optimize placement
+            let positionIndex = 0;
+            sortedDrinks.forEach(drink => {
+                const quantity = drinkQuantities[drink.name] || 0;
+                for (let i = 0; i < quantity; i++) {
+                    if (positionIndex < sortedPositions.length * shelves.length) {
+                        const shelfIndex = Math.floor(positionIndex / 25);
+                        const position = sortedPositions[positionIndex % 25].index;
+                        shelves[shelfIndex].items[position] = drink.name;
+                        positionIndex++;
+                    }
+                }
+            });
+
+            updateShelfDisplay();
+        }
+
+        function getColorForDrink(drinkName) {
+            const drink = drinks.find(d => d.name === drinkName);
+            if (drink) {
+                const hue = (drink.sellingPower / 10) * 120; // 0 is red, 120 is green
+                return `hsl(${hue}, 70%, 80%)`;
+            }
+            return '#ffffff'; // Default to white if drink not found
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeDrinkSelect();
+            updateShelfDisplay();
+            createHeatMap();
+            initializeDrinkList();
+
+            document.getElementById('prev-shelf').addEventListener('click', () => {
+                currentShelfIndex = (currentShelfIndex - 1 + shelves.length) % shelves.length;
+                updateShelfDisplay();
+            });
+
+            document.getElementById('next-shelf').addEventListener('click', () => {
+                currentShelfIndex = (currentShelfIndex + 1) % shelves.length;
+                updateShelfDisplay();
+            });
+
+            document.getElementById('optimize-button').addEventListener('click', optimizeShelves);
+        });
+    </script>
+</body>
+</html>
